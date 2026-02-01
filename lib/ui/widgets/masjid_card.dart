@@ -1,7 +1,9 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../../models/masjid.dart';
+import '../../controllers/masjid_controller.dart';
+import '../../models/masjid_model.dart';
 import '../masjid_detail_screen.dart';
 
 class MasjidCard extends StatelessWidget {
@@ -32,157 +34,207 @@ class MasjidCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 24),
-      elevation: 8,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => MasjidDetailScreen(masjid: masjid),
-            ),
-          );
-        },
-        child: AspectRatio(
-          aspectRatio: 4 / 3,
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              // Background Image
-              Hero(
-                tag: masjid.id,
-                child: CachedNetworkImage(
-                  imageUrl: masjid.imageUrls.first,
-                  fit: BoxFit.cover,
-                  placeholder: (context, url) => Container(
-                    color: Colors.grey[800],
-                    child: const Center(child: CircularProgressIndicator()),
-                  ),
-                  errorWidget: (context, url, error) => Container(
-                    color: Colors.grey[800],
-                    child: const Icon(
-                      Icons.broken_image,
-                      size: 50,
-                      color: Colors.white54,
-                    ),
-                  ),
-                ),
-              ),
+    // Access distance from controller
+    final distance = context.read<MasjidController>().getDistanceFormatted(
+      masjid.id,
+    );
 
-              // Gradient Overlay
-              Align(
-                alignment: Alignment.bottomCenter,
-                child: Container(
-                  height: 160,
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [Colors.transparent, Colors.black87],
-                    ),
-                  ),
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E1E1E),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.5),
+            blurRadius: 10,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => MasjidDetailScreen(masjid: masjid),
                 ),
-              ),
-
-              // Content
-              Positioned(
-                left: 16,
-                right: 16,
-                bottom: 16,
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
+              );
+            },
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Stack(
                   children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          // Distance Badge
-                          if (masjid.distanceKm != null)
-                            Container(
-                              margin: const EdgeInsets.only(bottom: 8),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.tealAccent.withOpacity(0.2),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: Colors.tealAccent.withOpacity(0.5),
-                                ),
-                              ),
-                              child: Text(
-                                '${masjid.distanceKm!.toStringAsFixed(1)} km away',
-                                style: const TextStyle(
-                                  color: Colors.tealAccent,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                    // Main Image with Hero
+                    Hero(
+                      tag: masjid.id,
+                      child: AspectRatio(
+                        aspectRatio: 4 / 3,
+                        child: CachedNetworkImage(
+                          imageUrl: masjid.imageUrl,
+                          fit: BoxFit.cover,
+                          placeholder: (context, url) => Container(
+                            color: Colors.grey[900],
+                            child: const Center(
+                              child: CircularProgressIndicator(
+                                color: Colors.tealAccent,
                               ),
                             ),
-
-                          // Name
-                          Text(
-                            masjid.name,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 22,
-                              fontWeight: FontWeight.bold,
-                              height: 1.2,
-                            ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
                           ),
+                          errorWidget: (context, url, error) => Container(
+                            color: Colors.grey[900],
+                            child: const Icon(
+                              Icons.broken_image,
+                              size: 50,
+                              color: Colors.white54,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
 
-                          const SizedBox(height: 4),
+                    // Gradient Overlay
+                    Positioned.fill(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.transparent,
+                              Colors.transparent,
+                              Colors.black.withOpacity(0.1),
+                              Colors.black.withOpacity(0.9),
+                            ],
+                            stops: const [0.0, 0.5, 0.7, 1.0],
+                          ),
+                        ),
+                      ),
+                    ),
 
-                          // Location
-                          Row(
-                            children: [
-                              const Icon(
-                                Icons.location_on,
-                                size: 14,
-                                color: Colors.white70,
-                              ),
-                              const SizedBox(width: 4),
-                              Expanded(
-                                child: Text(
-                                  masjid.locationName,
-                                  style: const TextStyle(
-                                    color: Colors.white70,
-                                    fontSize: 14,
+                    // Content Overlay
+                    Positioned(
+                      left: 16,
+                      right: 16,
+                      bottom: 16,
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                // Distance Badge
+                                if (distance.isNotEmpty)
+                                  Container(
+                                    margin: const EdgeInsets.only(bottom: 8),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.tealAccent,
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Icon(
+                                          Icons.near_me,
+                                          size: 12,
+                                          color: Colors.black87,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          distance,
+                                          style: const TextStyle(
+                                            color: Colors.black87,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                                  maxLines: 1,
+
+                                // Name
+                                Text(
+                                  masjid.name,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.bold,
+                                    height: 1.2,
+                                    shadows: [
+                                      Shadow(
+                                        offset: Offset(0, 1),
+                                        blurRadius: 3.0,
+                                        color: Colors.black,
+                                      ),
+                                    ],
+                                  ),
+                                  maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
                                 ),
+
+                                const SizedBox(height: 4),
+
+                                // Location
+                                Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.location_on,
+                                      size: 14,
+                                      color: Colors.white70,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Expanded(
+                                      child: Text(
+                                        masjid.locationShort,
+                                        style: const TextStyle(
+                                          color: Colors.white70,
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          // Navigation Button
+                          const SizedBox(width: 8),
+                          Material(
+                            color: Colors.white.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(50),
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(50),
+                              onTap: _launchNavigation,
+                              child: Container(
+                                padding: const EdgeInsets.all(12),
+                                child: const Icon(
+                                  Icons.directions,
+                                  color: Colors.tealAccent,
+                                ),
                               ),
-                            ],
+                            ),
                           ),
                         ],
                       ),
                     ),
-
-                    // Navigation Button
-                    const SizedBox(width: 12),
-                    FloatingActionButton(
-                      heroTag:
-                          'nav_${masjid.id}', // Unique tag to avoid conflicts
-                      onPressed: _launchNavigation,
-                      backgroundColor: Colors.tealAccent,
-                      mini: true,
-                      child: const Icon(
-                        Icons.turn_right,
-                        color: Colors.black87,
-                      ),
-                    ),
                   ],
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

@@ -1,13 +1,24 @@
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
-import '../models/masjid.dart';
+import '../models/masjid_model.dart';
 import '../repositories/masjid_repository.dart';
 
 class MasjidController extends ChangeNotifier {
-  final MasjidRepository _repository;
+  List<Masjid> _allMasjids = [];
+  String _searchQuery = '';
 
-  List<Masjid> _masjids = [];
-  List<Masjid> get masjids => _masjids;
+  List<Masjid> get masjids {
+    if (_searchQuery.isEmpty) {
+      return _allMasjids;
+    }
+    final query = _searchQuery.toLowerCase();
+    return _allMasjids.where((masjid) {
+      return masjid.name.toLowerCase().contains(query) ||
+          masjid.locationShort.toLowerCase().contains(query);
+    }).toList();
+  }
+
+  final Map<String, double> _distances = {};
 
   bool _isLoading = false;
   bool get isLoading => _isLoading;
@@ -15,61 +26,82 @@ class MasjidController extends ChangeNotifier {
   String? _errorMessage;
   String? get errorMessage => _errorMessage;
 
-  MasjidController({MasjidRepository? repository})
-    : _repository = repository ?? MasjidRepository();
+  // Helper method for UI to get distance
+  String getDistanceFormatted(String id) {
+    if (_distances.containsKey(id)) {
+      double km = _distances[id]! / 1000;
+      return '${km.toStringAsFixed(1)} km';
+    }
+    return '';
+  }
+
+  void updateSearchQuery(String query) {
+    _searchQuery = query;
+    notifyListeners();
+  }
 
   Future<void> init() async {
     _setLoading(true);
     try {
+      // Load Masjids from static repository method
+      _allMasjids = MasjidRepository.getFamousMasjids();
+
       // 1. Check/Request Permissions
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
-        throw Exception('Location services are disabled.');
+        // Don't throw, just return. List will be shown without distances.
+        // Or throw if we strictly want to warn.
+        // For UX, showing list is better. But if we want to translate error:
+        // throw Exception('Perkhidmatan lokasi dimatikan.');
+        _setLoading(false);
+        return;
       }
 
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) {
-          throw Exception('Location permissions are denied');
+          // throw Exception('Kebenaran lokasi ditolak.');
+          _setLoading(false);
+          return;
         }
       }
 
       if (permission == LocationPermission.deniedForever) {
-        throw Exception(
-          'Location permissions are permanently denied, we cannot request permissions.',
-        );
+        // throw Exception('Kebenaran lokasi ditolak secara kekal.');
+        _setLoading(false);
+        return;
       }
 
       // 2. Get Current Position
       Position position = await Geolocator.getCurrentPosition();
 
-      // 3. Get Masjids from Repository
-      List<Masjid> rawMasjids = _repository.getMasjids();
-
-      // 4. Calculate Distances and Sort
-      List<Masjid> processedMasjids = rawMasjids.map((masjid) {
+      // 3. Calculate Distances
+      for (var masjid in _allMasjids) {
         double distanceInMeters = Geolocator.distanceBetween(
           position.latitude,
           position.longitude,
           masjid.latitude,
           masjid.longitude,
         );
-        return masjid.copyWith(distanceKm: distanceInMeters / 1000);
-      }).toList();
+        _distances[masjid.id] = distanceInMeters;
+      }
 
-      processedMasjids.sort(
-        (a, b) => (a.distanceKm ?? 0).compareTo(b.distanceKm ?? 0),
-      );
+      // 4. Sort by distance
+      _allMasjids.sort((a, b) {
+        double distA = _distances[a.id] ?? double.maxFinite;
+        double distB = _distances[b.id] ?? double.maxFinite;
+        return distA.compareTo(distB);
+      });
 
-      _masjids = processedMasjids;
       _errorMessage = null;
     } catch (e) {
-      _errorMessage = e.toString();
-      // Even if location fails, we might want to show the list unsorted or with default sort
-      // For now, we'll just show the raw list if we have it, or empty if getting raw list failed (which it shouldn't here)
-      if (_masjids.isEmpty) {
-        _masjids = _repository.getMasjids();
+      // Translate common geolocator errors if they bubble up, or generic error
+      _errorMessage = e.toString().replaceAll('Exception: ', '');
+
+      // Ensure we have data even if location fails
+      if (_allMasjids.isEmpty) {
+        _allMasjids = MasjidRepository.getFamousMasjids();
       }
     } finally {
       _setLoading(false);

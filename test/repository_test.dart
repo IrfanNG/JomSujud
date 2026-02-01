@@ -1,11 +1,10 @@
+import 'package:flutter_test/flutter_test.dart';
 import 'package:jom_sujud/repositories/masjid_repository.dart';
 
 void main() {
-  final repo = MasjidRepository();
-  final masjids = repo.getMasjids();
-
-  print('Successfully fetched ${masjids.length} mosques:');
-  for (var masjid in masjids) {
-    print('- ${masjid.name} (${masjid.locationName})');
-  }
+  test('MasjidRepository returns famous masjids', () {
+    final masjids = MasjidRepository.getFamousMasjids();
+    expect(masjids.length, 3);
+    expect(masjids.first.name, 'Masjid Besi (Tuanku Mizan Zainal Abidin)');
+  });
 }
